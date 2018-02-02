@@ -302,15 +302,21 @@ icnl_tlv_off_t icnl_ndn_decode_interest_hc(uint8_t *out, const uint8_t *in,
     }
 
     out[pos_out++] = ICNL_NDN_TLV_INTEREST;
+    printf("%u;", ICNL_NDN_TLV_INTEREST);
     out_packet_length = out + (pos_out++);
 
     /* skip packet length */
     icnl_ndn_tlv_hc_read(in, &pos_in);
 
-    pos_out += icnl_ndn_decode_name(out + pos_out, in, &pos_in, a);
-    pos_out += icnl_ndn_decode_selectors(out + pos_out, in, &pos_in, b);
-    pos_out += icnl_ndn_decode_nonce(out + pos_out, in, &pos_in, a);
-    pos_out += icnl_ndn_decode_interest_lifetime(out + pos_out, in, &pos_in, a);
+    unsigned t = 0;
+    pos_out += t = icnl_ndn_decode_name(out + pos_out, in, &pos_in, a);
+    printf("%u;", t);
+    pos_out += t = icnl_ndn_decode_selectors(out + pos_out, in, &pos_in, b);
+    printf("%u;", t);
+    pos_out += t = icnl_ndn_decode_nonce(out + pos_out, in, &pos_in, a);
+    printf("%u;", t);
+    pos_out += t = icnl_ndn_decode_interest_lifetime(out + pos_out, in, &pos_in, a);
+    printf("%u;", t);
 
     memcpy(out + pos_out, in + pos_in, in_len - pos_in);
     pos_out += in_len - pos_in;
@@ -328,6 +334,9 @@ icnl_tlv_off_t icnl_ndn_decode_interest_hc(uint8_t *out, const uint8_t *in,
     }
 
     memcpy(out_packet_length, tmp, tmp_len);
+
+    printf("%u;", (unsigned) tmp_len + 1);
+    printf("%u;", (unsigned) (out_packet_length - out) - 1);
 
     return pos_out;
 }
@@ -345,16 +354,23 @@ icnl_tlv_off_t icnl_ndn_decode_data_hc(uint8_t *out, const uint8_t *in,
     }
 
     out[pos_out++] = ICNL_NDN_TLV_DATA;
+    printf("%u;", ICNL_NDN_TLV_DATA);
     out_packet_length = out + (pos_out++);
 
     /* skip packet length */
     icnl_ndn_tlv_hc_read(in, &pos_in);
 
-    pos_out += icnl_ndn_decode_name(out + pos_out, in, &pos_in, a);
-    pos_out += icnl_ndn_decode_meta_info(out + pos_out, in, &pos_in, b);
-    pos_out += icnl_ndn_decode_content(out + pos_out, in, &pos_in, a);
-    pos_out += icnl_ndn_decode_signature_info(out + pos_out, in, &pos_in, a);
-    pos_out += icnl_ndn_decode_signature_value(out + pos_out, in, &pos_in, in_len, a);
+    unsigned t = 0;
+    pos_out += t = icnl_ndn_decode_name(out + pos_out, in, &pos_in, a);
+    printf("%u;", t);
+    pos_out += t = icnl_ndn_decode_meta_info(out + pos_out, in, &pos_in, b);
+    printf("%u;", t);
+    pos_out += t = icnl_ndn_decode_content(out + pos_out, in, &pos_in, a);
+    printf("%u;", t);
+    pos_out += t = icnl_ndn_decode_signature_info(out + pos_out, in, &pos_in, a);
+    printf("%u;", t);
+    pos_out += t = icnl_ndn_decode_signature_value(out + pos_out, in, &pos_in, in_len, a);
+    printf("%u;", t);
 
     memcpy(out + pos_out, in + pos_in, in_len - pos_in);
     pos_out += in_len - pos_in;
@@ -372,6 +388,9 @@ icnl_tlv_off_t icnl_ndn_decode_data_hc(uint8_t *out, const uint8_t *in,
     }
 
     memcpy(out_packet_length, tmp, tmp_len);
+
+    printf("%u;", (unsigned) tmp_len + 1);
+    printf("%u;", (unsigned) (out_packet_length - out) - 1);
 
     return pos_out;
 }

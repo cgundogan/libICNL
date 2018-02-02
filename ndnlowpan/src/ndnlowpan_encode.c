@@ -320,6 +320,8 @@ icnl_tlv_off_t icnl_ndn_encode_interest_hc(uint8_t *out, const uint8_t *in,
     a = out + (pos_out++);
     *a = 0x00;
 
+    printf("%u;", ICNL_NDN_TLV_INTEREST);
+
     /* skip packet type */
     icnl_ndn_tlv_read(in, &pos_in);
 
@@ -350,6 +352,7 @@ icnl_tlv_off_t icnl_ndn_encode_interest_hc(uint8_t *out, const uint8_t *in,
                 return 0;
         }
 
+        printf("%u;", (unsigned) res);
         pos_out += res;
     }
 
@@ -383,6 +386,9 @@ icnl_tlv_off_t icnl_ndn_encode_interest_hc(uint8_t *out, const uint8_t *in,
 
     memcpy(out_packet_length, tmp, tmp_len);
 
+    printf("%u;", (unsigned) tmp_len);
+    printf("%u;", (unsigned) (out_packet_length - out) + 1);
+
     return pos_out;
 }
 
@@ -397,6 +403,8 @@ icnl_tlv_off_t icnl_ndn_encode_data_hc(uint8_t *out, const uint8_t *in,
 
     a = out + (pos_out++);
     *a = 0x00;
+
+    printf("%u;", ICNL_NDN_TLV_DATA);
 
     /* skip packet type */
     icnl_ndn_tlv_read(in, &pos_in);
@@ -431,6 +439,7 @@ icnl_tlv_off_t icnl_ndn_encode_data_hc(uint8_t *out, const uint8_t *in,
                 return 0;
         }
 
+        printf("%u;", (unsigned) res);
         pos_out += res;
     }
 
@@ -463,6 +472,9 @@ icnl_tlv_off_t icnl_ndn_encode_data_hc(uint8_t *out, const uint8_t *in,
     }
 
     memcpy(out_packet_length, tmp, tmp_len);
+
+    printf("%u;", (unsigned) tmp_len);
+    printf("%u;", (unsigned) (out_packet_length - out) + 1);
 
     return pos_out;
 }
