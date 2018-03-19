@@ -74,6 +74,23 @@ icnl_tlv_off_t icnl_ndn_encode_name(uint8_t *out, const uint8_t *in, icnl_tlv_of
 
         icnl_tlv_off_t total_name_length = 0;
         icnl_tlv_off_t end_pos = (*pos_in) + name_len;
+
+        // don't compress when global pfx is greater than input
+        if(name_len >= glob_pfx_len && state_compressed){
+            // check if the global prefix matches 'in'
+            if(!memcmp(&in[*pos_in], &hawpfx[total_name_length], glob_pfx_len)){
+                if(name_len == glob_pfx_len){
+                    ICNL_DBG("name_len == glob_pfx_len\n");
+                    // request equals whole prefix. set name length to zero
+                    out[0] = 0x00;
+                    return pos_out;
+                }
+                else{
+                    ICNL_DBG("name_len > glob_pfx_len\n");
+                    (*pos_in) += glob_pfx_len;
+                }
+            }
+        }
         do {
             /* skip component type */
             type = icnl_ndn_tlv_read(in, pos_in);

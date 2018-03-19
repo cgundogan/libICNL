@@ -30,6 +30,10 @@ static const uint8_t ndn_int_hc_01[] = {
     0x12, 0x57, 0x05, 0x00, 0x03, 0xe8
 };
 
+static const uint8_t ndn_int_state_01[] = {
+    0xF2, ICNL_DISPATCH_NDN_INT_HC_A, 0x44, /* Page 2 and LOWPAN_NDN_INT_HC_A */
+    0x0d, 0x00, 0x12, 0x57, 0x05, 0x00, 0x03, 0xe8
+};
 static const uint8_t ndn_int_02[] = {
     0x05, 0x14, 0x07, 0x08, 0x08, 0x03, 0x48, 0x41,
     0x57, 0x08, 0x01, 0x41, 0x0a, 0x04, 0x12, 0x57,
@@ -51,6 +55,20 @@ static const uint8_t ndn_int_hc_03[] = {
     0xF2, ICNL_DISPATCH_NDN_INT_HC_AB, 0x4A, 0x02, /* Page 2 and LOWPAN_NDN_INT_HC_A */
     0x0b, 0x06, 0x03, 0x48, 0x41, 0x57, 0x01, 0x41,
     0xd6, 0x3d, 0xb2, 0x5b
+};
+
+static const uint8_t ndn_int_04[] = {
+    0x05, 0x17, 0x07, 0x0b, 0x08, 0x03, 0x48, 0x41,
+    0x57, 0x08, 0x01, 0x41, 0x08, 0x01, 0x44, 0x0a,
+    0x04, 0x12, 0x57, 0x05, 0x00, 0x0c, 0x02, 0x03,
+    0xe8
+};
+
+// i THINK in below array the 0x09 should be 0x0d, similar to the others
+static const uint8_t ndn_int_state_04[] = {
+    0xF2, ICNL_DISPATCH_NDN_INT_HC_A, 0x44, /* Page 2 and LOWPAN_NDN_INT_HC_A */
+    0x09, 0x02, 0x01, 0x44, 0x12, 0x57, 0x05, 0x00,
+    0x03, 0xe8
 };
 
 static const uint8_t ndn_data_01[] = {
@@ -550,12 +568,46 @@ void test_decode_ndn_data_hc_06(void)
     TEST_ASSERT_EQUAL_UINT8_ARRAY(ndn_data_06, out_data, pos_data);
 }
 
+void test_decode_ndn_int_state_01(void)
+{
+    uint8_t out_int[sizeof(ndn_int_01) / sizeof(ndn_int_01[0]) + 16];
+
+    icnl_tlv_off_t pos_int = icnl_decode(out_int, (uint8_t *)ndn_int_state_01,
+                                         sizeof(ndn_int_state_01)/sizeof(ndn_int_state_01[0]));
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(ndn_int_01)/sizeof(ndn_int_01[0]), pos_int);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(ndn_int_01, out_int, pos_int);
+}
+
+void test_encode_ndn_int_state_04(void)
+{
+    uint8_t out_int[sizeof(ndn_int_04) / sizeof(ndn_int_04[0]) + 16];
+
+    icnl_tlv_off_t pos_int = icnl_encode(out_int, ICNL_PROTO_NDN_HC,
+                                         (uint8_t *)ndn_int_04,
+                                         sizeof(ndn_int_04)/sizeof(ndn_int_04[0]));
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(ndn_int_state_04)/sizeof(ndn_int_state_04[0]), pos_int);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(ndn_int_state_04, out_int, pos_int);
+}
+
+void test_decode_ndn_int_state_04(void)
+{
+    uint8_t out_int[sizeof(ndn_int_04) / sizeof(ndn_int_04[0]) + 16];
+
+    icnl_tlv_off_t pos_int = icnl_decode(out_int, (uint8_t *)ndn_int_state_04,
+                                         sizeof(ndn_int_state_04)/sizeof(ndn_int_state_04[0]));
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(ndn_int_04)/sizeof(ndn_int_04[0]), pos_int);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(ndn_int_04, out_int, pos_int);
+}
+
 #endif
- 
+
 int main(void)
 {
     UNITY_BEGIN();
- 
+
 #ifdef MODULE_NDNLOWPAN
     RUN_TEST(test_encode_ndn);
     RUN_TEST(test_encode_ndn_int_hc_01);
@@ -577,7 +629,11 @@ int main(void)
     RUN_TEST(test_decode_ndn_data_hc_04);
     RUN_TEST(test_decode_ndn_data_hc_05);
     RUN_TEST(test_decode_ndn_data_hc_06);
+    state_compressed=1;
+    RUN_TEST(test_decode_ndn_int_state_01);
+    RUN_TEST(test_encode_ndn_int_state_04);
+    RUN_TEST(test_decode_ndn_int_state_04);
 #endif
- 
+
     return UNITY_END();
 }
