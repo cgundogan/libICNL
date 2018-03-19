@@ -16,11 +16,16 @@
  */
 #ifndef NDNLOWPAN_H
 #define NDNLOWPAN_H
- 
+
 #include <stdint.h>
 
 #include "icnlowpan.h"
 #include "debug.h"
+
+static uint8_t hawpfx[]={0x08, 0x03, 0x48, 0x41, 0x57, 0x08, 0x01, 0x41};
+static unsigned glob_pfx_len = sizeof(hawpfx)/sizeof(hawpfx[0]);
+
+int state_compressed;
 
 /**
  * @brief   Dispatch type for NDN Interest

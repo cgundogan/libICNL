@@ -48,15 +48,31 @@ icnl_tlv_off_t icnl_ndn_decode_name(uint8_t *out, const uint8_t *in,
             component_type = ICNL_NDN_TLV_IMPLICIT_SHA256_DIGEST_COMPONENT;
         }
 
-        icnl_tlv_off_t offset = *pos_in + name_len;
-        while (*pos_in < offset) {
-            out[pos_out++] = component_type;
-            out_total_name_len += 1;
-            uint8_t comp_len = in[*pos_in] + 1;
-            memcpy(out + pos_out, in + *pos_in, comp_len);
-            pos_out += comp_len;
-            *pos_in += comp_len;
-            out_total_name_len += comp_len;
+        if (name_len == 0x00) {
+            // whole global prefix
+            ICNL_DBG("name_len == 0x00\n");
+            memcpy(out + pos_out, hawpfx, glob_pfx_len);
+            out_total_name_len = glob_pfx_len;
+            pos_out += glob_pfx_len;
+        }
+        else {
+            if(state_compressed) {
+                ICNL_DBG("fraction has been compressed\n");
+                memcpy(out + pos_out, hawpfx, glob_pfx_len);
+                out_total_name_len = glob_pfx_len;
+                pos_out += glob_pfx_len;
+            }
+
+            icnl_tlv_off_t offset = *pos_in + name_len;
+            while (*pos_in < offset) {
+                out[pos_out++] = component_type;
+                out_total_name_len += 1;
+                uint8_t comp_len = in[*pos_in] + 1;
+                memcpy(out + pos_out, in + *pos_in, comp_len);
+                pos_out += comp_len;
+                *pos_in += comp_len;
+                out_total_name_len += comp_len;
+            }
         }
     }
 
