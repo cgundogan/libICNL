@@ -15,8 +15,14 @@
 #include "ndnlowpan.h"
 #endif
 
+icnl_cb_hopid_t icnl_cb_hopid;
+icnl_cb_skip_prefix_t icnl_cb_hopid_skip_prefix;
+icnl_cb_skip_prefix_t icnl_cb_context_skip_prefix;
+icnl_cb_decompress_name_t icnl_cb_hopid_decompress_name;
+icnl_cb_decompress_name_t icnl_cb_context_decompress_name;
+
 icnl_tlv_off_t icnl_encode(uint8_t *out, icnl_proto_t proto, const uint8_t *in,
-                icnl_tlv_off_t in_len)
+                icnl_tlv_off_t in_len, uint8_t *cids, unsigned cid_len, void *context)
 {
     icnl_tlv_off_t pos = 0;
 
@@ -26,7 +32,7 @@ icnl_tlv_off_t icnl_encode(uint8_t *out, icnl_proto_t proto, const uint8_t *in,
     if (0) {}
 #ifdef MODULE_NDNLOWPAN
     else if ((proto == ICNL_PROTO_NDN) || (proto == ICNL_PROTO_NDN_HC)) {
-        pos += icnl_ndn_encode(out + pos, proto, in, in_len);
+        pos += icnl_ndn_encode(out + pos, proto, in, in_len, cids, cid_len, context);
     }
 #endif
 #ifdef MODULE_CCNLOWPAN
@@ -42,7 +48,8 @@ icnl_tlv_off_t icnl_encode(uint8_t *out, icnl_proto_t proto, const uint8_t *in,
 	return pos;
 }
 
-icnl_tlv_off_t icnl_decode(uint8_t *out, const uint8_t *in, icnl_tlv_off_t in_len)
+icnl_tlv_off_t icnl_decode(uint8_t *out, const uint8_t *in, icnl_tlv_off_t in_len,
+                           void *context)
 {
     icnl_tlv_off_t pos = 0;
     icnl_tlv_off_t out_len = 0;
@@ -56,14 +63,14 @@ icnl_tlv_off_t icnl_decode(uint8_t *out, const uint8_t *in, icnl_tlv_off_t in_le
 
     if (0) {}
 #ifdef MODULE_NDNLOWPAN
-    else if ((*dispatch & 0x8F) == 0x80) {
-        out_len = icnl_ndn_decode(out, ICNL_PROTO_NDN, in + pos, in_len - pos);
+    else if (!(*dispatch & 0x80)) {
+        out_len = icnl_ndn_decode(out, ICNL_PROTO_NDN, in + pos, in_len - pos, context);
     }
-    else if ((*dispatch & 0x88) == 0x88) {
-        out_len = icnl_ndn_decode(out, ICNL_PROTO_NDN_HC, in + pos, in_len - pos);
+    else if (*dispatch & 0x80) {
+        out_len = icnl_ndn_decode(out, ICNL_PROTO_NDN_HC, in + pos, in_len - pos, context);
     }
 #endif
-#ifdef MODULE_NDNLOWPAN
+#ifdef MODULE_CCNLOWPAN
     else if (*dispatch ^ 0x80) {
         ICNL_DBG("CCN is unsupported currently\n");
         return 0;

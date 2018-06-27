@@ -63,12 +63,16 @@ typedef enum {
  * @param[in]   proto   ICN protocol @ref icnl_proto_t
  * @param[in]   in      input buffer that is to be encoded
  * @param[in]   in_len  length of the input buffer @p in
+ * @param[in]   cids    array of Context Identifiers
+ * @param[in]   cid_len length of @p cids
+ * @param[in]   context container for user application context used in callback functions
  *
  * @return      Number of bytes written to @p out
  * @retval      0 on error
  */
 icnl_tlv_off_t icnl_encode(uint8_t *out, icnl_proto_t proto, const uint8_t *in,
-                           icnl_tlv_off_t in_len);
+                           icnl_tlv_off_t in_len, uint8_t *cids, unsigned cid_len,
+                           void *context);
 
 /**
  * @brief       Decodes a packet
@@ -76,11 +80,34 @@ icnl_tlv_off_t icnl_encode(uint8_t *out, icnl_proto_t proto, const uint8_t *in,
  * @param[out]  out     output buffer that will contain the decoded format
  * @param[in]   in      input buffer that is to be decoded
  * @param[in]   in_len  length of the input buffer @p in
+ * @param[in]   context container for user application context used in callback functions
  *
  * @return      Number of bytes written to @p out
  * @retval      0 on error
  */
-icnl_tlv_off_t icnl_decode(uint8_t *out, const uint8_t *in, icnl_tlv_off_t in_len);
+icnl_tlv_off_t icnl_decode(uint8_t *out, const uint8_t *in, icnl_tlv_off_t in_len,
+                           void *context);
+
+/**
+ * @brief Function pointer callback type. Triggered when a hop id is parsed.
+ */
+typedef void (*icnl_cb_hopid_t)(uint8_t hopid);
+
+/**
+ * @brief Function pointer callback type. Triggered when a data name is compressed.
+ */
+typedef unsigned (*icnl_cb_skip_prefix_t)(uint8_t hopid, void *context);
+
+/**
+ * @brief Function pointer callback type. Triggered when a data name is decompressed.
+ */
+typedef unsigned (*icnl_cb_decompress_name_t)(uint8_t *out, uint8_t hopid, void *context);
+
+extern icnl_cb_hopid_t icnl_cb_hopid;
+extern icnl_cb_skip_prefix_t icnl_cb_hopid_skip_prefix;
+extern icnl_cb_skip_prefix_t icnl_cb_context_skip_prefix;
+extern icnl_cb_decompress_name_t icnl_cb_hopid_decompress_name;
+extern icnl_cb_decompress_name_t icnl_cb_context_decompress_name;
  
 #endif /* ICNLOWPAN_H */
 /** @} */

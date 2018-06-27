@@ -145,11 +145,15 @@ typedef enum {
  * @param[in]   proto   ICN protocol @ref icnl_proto_t
  * @param[in]   in      input buffer that is to be encoded
  * @param[in]   in_len  length of the input buffer @p in
+ * @param[in]   cids    array of Context Identifiers
+ * @param[in]   cid_len length of @p cids
+ * @param[in]   context container for user application context used in callback functions
  *
  * @return      Number of bytes written to @p out
  */
 icnl_tlv_off_t icnl_ndn_encode(uint8_t *out, icnl_proto_t proto, const uint8_t *in,
-                               icnl_tlv_off_t in_len);
+                               icnl_tlv_off_t in_len, uint8_t *cids, unsigned cid_len,
+                               void *context);
 
 /**
  * @brief Decodes an NDN message
@@ -158,11 +162,12 @@ icnl_tlv_off_t icnl_ndn_encode(uint8_t *out, icnl_proto_t proto, const uint8_t *
  * @param[in]   proto   ICN protocol @ref icnl_proto_t
  * @param[in]   in      input buffer that is to be decoded
  * @param[in]   in_len  length of the input buffer @p in
+ * @param[in]   context container for user application context used in callback functions
  *
  * @return      Number of bytes written to @p out
  */
 icnl_tlv_off_t icnl_ndn_decode(uint8_t *out, icnl_proto_t proto, const uint8_t *in,
-                               icnl_tlv_off_t in_len);
+                               icnl_tlv_off_t in_len, void *context);
 
 #endif /* NDNLOWPAN_H */
 /** @} */

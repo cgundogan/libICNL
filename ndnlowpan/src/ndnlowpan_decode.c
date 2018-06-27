@@ -6,6 +6,7 @@
  * directory for more details.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -20,44 +21,59 @@ icnl_tlv_off_t icnl_ndn_decode_interest(uint8_t *out, const uint8_t *in,
 }
 
 icnl_tlv_off_t icnl_ndn_decode_name(uint8_t *out, const uint8_t *in,
-                                    icnl_tlv_off_t *pos_in, const uint8_t *a)
+                                    icnl_tlv_off_t *pos_in, uint8_t hop_id,
+                                    uint8_t *prefix_cid,
+                                    void *context)
 {
-    icnl_tlv_off_t pos_out = 0, name_len;
+    icnl_tlv_off_t pos_out = 0;
     uint8_t out_total_name_len = 0;
     uint8_t *name_length;
 
     out[pos_out++] = ICNL_NDN_TLV_NAME;
 
-    name_len = icnl_ndn_tlv_hc_read(in, pos_in);
     name_length = out + (pos_out++);
     /* skip maximum amount of possible length field size */
     pos_out += 8;
 
-    if ((*a & 0xC0) == 0) {
-        memcpy(out + pos_out, in + *pos_in, name_len);
-        *pos_in += name_len;
-        pos_out += name_len;
+    uint8_t tmp_len, tmp_len_masked;
+    bool first = true;
+
+    if (prefix_cid && icnl_cb_context_decompress_name) {
+        pos_out += out_total_name_len = icnl_cb_context_decompress_name((out + pos_out), (*prefix_cid) & 0x7F, context);
     }
-    else {
-        uint8_t component_type = 0x00;
 
-        if (*a & 0x40) {
-            component_type = ICNL_NDN_TLV_GENERIC_NAME_COMPONENT;
+    if ((hop_id & 0x40) && icnl_cb_hopid_decompress_name) {
+        pos_out += out_total_name_len = icnl_cb_hopid_decompress_name((out + pos_out), hop_id & 0x7F, context);
+    }
+
+    while (true) {
+
+        if (first) {
+            tmp_len = in[(*pos_in)++];
+            tmp_len_masked = (tmp_len & 0xF0) >> 4;
+            first = false;
         }
-        else if (*a & 0x80) {
-            component_type = ICNL_NDN_TLV_IMPLICIT_SHA256_DIGEST_COMPONENT;
+        else {
+            tmp_len_masked = (tmp_len & 0x0F) >> 0;
+            first = true;
         }
 
-        icnl_tlv_off_t offset = *pos_in + name_len;
-        while (*pos_in < offset) {
-            out[pos_out++] = component_type;
-            out_total_name_len += 1;
-            uint8_t comp_len = in[*pos_in] + 1;
-            memcpy(out + pos_out, in + *pos_in, comp_len);
-            pos_out += comp_len;
-            *pos_in += comp_len;
-            out_total_name_len += comp_len;
+        if (tmp_len_masked == 0) {
+            break;
         }
+
+        /* write type */
+        out[pos_out++] = ICNL_NDN_TLV_GENERIC_NAME_COMPONENT;
+        out_total_name_len += 1;
+
+        /* write length */
+        icnl_ndn_tlv_write(tmp_len_masked, out, &pos_out);
+        out_total_name_len += 1;
+
+        memcpy(out + pos_out, in + *pos_in, tmp_len_masked);
+        pos_out += tmp_len_masked;
+        *pos_in += tmp_len_masked;
+        out_total_name_len += tmp_len_masked;
     }
 
     icnl_tlv_off_t tmp = 0;
@@ -69,22 +85,14 @@ icnl_tlv_off_t icnl_ndn_decode_name(uint8_t *out, const uint8_t *in,
 }
 
 icnl_tlv_off_t icnl_ndn_decode_nonce(uint8_t *out, const uint8_t *in,
-                                     icnl_tlv_off_t *pos_in, const uint8_t *a)
+                                     icnl_tlv_off_t *pos_in)
 {
-    icnl_tlv_off_t pos_out = 0, nonce_len = 4;
-
-    if ((*a & 0x30) == 0x10) {
-        nonce_len = 1;
-    }
-    else if ((*a & 0x30) == 0x20) {
-        nonce_len = 2;
-    }
+    icnl_tlv_off_t pos_out = 0;
 
     out[pos_out++] = ICNL_NDN_TLV_NONCE;
     out[pos_out++] = 4;
 
-    memset(out + pos_out, 0, 4);
-    memcpy(out + pos_out + 4 - nonce_len, in + *pos_in, nonce_len);
+    memcpy(out + pos_out, in + *pos_in, 4);
     *pos_in += 4;
     pos_out += 4;
 
@@ -212,9 +220,8 @@ icnl_tlv_off_t icnl_ndn_decode_meta_info(uint8_t *out, const uint8_t *in,
 }
 
 icnl_tlv_off_t icnl_ndn_decode_content(uint8_t *out, const uint8_t *in,
-                                       icnl_tlv_off_t *pos_in, const uint8_t *a)
+                                       icnl_tlv_off_t *pos_in)
 {
-    (void) a;
     icnl_tlv_off_t pos_out = 0, len;
 
     len = icnl_ndn_tlv_hc_read(in, pos_in);
@@ -230,75 +237,69 @@ icnl_tlv_off_t icnl_ndn_decode_content(uint8_t *out, const uint8_t *in,
 }
 
 icnl_tlv_off_t icnl_ndn_decode_signature_info(uint8_t *out, const uint8_t *in,
-                                              icnl_tlv_off_t *pos_in,
-                                              const uint8_t *a)
+                                              icnl_tlv_off_t *pos_in)
 {
-    uint8_t mode = *a & 0x38;
-    icnl_tlv_off_t pos_out = 0, len = 0;
+    icnl_tlv_off_t pos_out = 0, len;
 
-    if (mode == 0x00){
-        len = icnl_ndn_tlv_hc_read(in, pos_in);
-        /* include sigtype type */
-        len += 1;
-        out[pos_out++] = ICNL_NDN_TLV_SIGNATURE_INFO;
-        icnl_ndn_tlv_write(len, out, &pos_out);
-        out[pos_out++] = ICNL_NDN_TLV_SIGNATURE_TYPE;
-        memcpy(out + pos_out, in + *pos_in, len - 1);
-        pos_out += len - 1;
-        *pos_in += len - 1;
-    }
-    else if (mode == 0x08) {
-        out[pos_out++] = ICNL_NDN_TLV_SIGNATURE_INFO;
-        out[pos_out++] = 3;
-        out[pos_out++] = ICNL_NDN_TLV_SIGNATURE_TYPE;
-        out[pos_out++] = 1;
-        out[pos_out++] = 0x00;
-    }
+    len = icnl_ndn_tlv_hc_read(in, pos_in);
+
+    out[pos_out++] = ICNL_NDN_TLV_SIGNATURE_INFO;
+    icnl_ndn_tlv_write(len, out, &pos_out);
+
+    memcpy(out + pos_out, in + *pos_in, len);
+    *pos_in += len;
+    pos_out += len;
 
     return pos_out;
 }
 
 icnl_tlv_off_t icnl_ndn_decode_signature_value(uint8_t *out, const uint8_t *in,
-                                               icnl_tlv_off_t *pos_in,
-                                               icnl_tlv_off_t in_len,
-                                               const uint8_t *a)
+                                               icnl_tlv_off_t *pos_in)
 {
-    uint8_t mode = *a & 0x38;
-    icnl_tlv_off_t pos_out = 0, len = 0;
+    icnl_tlv_off_t pos_out = 0, len;
 
-    if (mode == 0x00){
-        out[pos_out++] = ICNL_NDN_TLV_SIGNATURE_VALUE;
-        len = icnl_ndn_tlv_hc_read(in, pos_in);
-        icnl_ndn_tlv_write(len, out, &pos_out);
-        memcpy(out + pos_out, in + *pos_in, len);
-        pos_out += len;
-        *pos_in += len;
-    }
-    else if (mode == 0x08) {
-        out[pos_out++] = ICNL_NDN_TLV_SIGNATURE_VALUE;
-        /* workaround for empty sig value in CCN-lite for NDN */
-        len = in_len - *pos_in ? 32 : 0;
-        out[pos_out++] = len;
-    }
+    len = icnl_ndn_tlv_hc_read(in, pos_in);
+
+    out[pos_out++] = ICNL_NDN_TLV_SIGNATURE_VALUE;
+    icnl_ndn_tlv_write(len, out, &pos_out);
 
     memcpy(out + pos_out, in + *pos_in, len);
-    pos_out += len;
     *pos_in += len;
+    pos_out += len;
 
     return pos_out;
 }
 
 icnl_tlv_off_t icnl_ndn_decode_interest_hc(uint8_t *out, const uint8_t *in,
-                                           icnl_tlv_off_t in_len, uint8_t dispatch)
+                                           icnl_tlv_off_t in_len, uint8_t dispatch,
+                                           void *context)
 {
     icnl_tlv_off_t pos_out = 0, pos_in = 0;
-    const uint8_t *a, *b = NULL;
-    uint8_t *out_packet_length;
+    uint8_t *out_packet_length, *prefix_cid = NULL;
 
-    a = in + pos_in++;
+    if (dispatch & 0x01) {
+        bool first = true;
+        uint8_t cid = in[pos_in];
 
-    if (dispatch == ICNL_DISPATCH_NDN_INT_HC_AB) {
-        b = in + pos_in++;
+        if ((cid & 0x40) && icnl_cb_hopid) {
+            icnl_cb_hopid(cid & 0x7F);
+            first = false;
+        }
+
+        if (first || (cid & 0x80)) {
+            if (!first) {
+                pos_in++;
+            }
+            if (!prefix_cid) {
+                prefix_cid = (uint8_t *) (in + pos_in);
+                cid = in[pos_in++];
+            }
+
+            while (cid & 0x80) {
+                cid = in[pos_in++];
+                /* do nothing for now */
+            }
+        }
     }
 
     out[pos_out++] = ICNL_NDN_TLV_INTEREST;
@@ -307,10 +308,14 @@ icnl_tlv_off_t icnl_ndn_decode_interest_hc(uint8_t *out, const uint8_t *in,
     /* skip packet length */
     icnl_ndn_tlv_hc_read(in, &pos_in);
 
-    pos_out += icnl_ndn_decode_name(out + pos_out, in, &pos_in, a);
+    pos_out += icnl_ndn_decode_name(out + pos_out, in, &pos_in, 0, prefix_cid, context);
+#if 0
     pos_out += icnl_ndn_decode_selectors(out + pos_out, in, &pos_in, b);
-    pos_out += icnl_ndn_decode_nonce(out + pos_out, in, &pos_in, a);
+#endif
+    pos_out += icnl_ndn_decode_nonce(out + pos_out, in, &pos_in);
+#if 0
     pos_out += icnl_ndn_decode_interest_lifetime(out + pos_out, in, &pos_in, a);
+#endif
 
     memcpy(out + pos_out, in + pos_in, in_len - pos_in);
     pos_out += in_len - pos_in;
@@ -333,15 +338,20 @@ icnl_tlv_off_t icnl_ndn_decode_interest_hc(uint8_t *out, const uint8_t *in,
 }
 
 icnl_tlv_off_t icnl_ndn_decode_data_hc(uint8_t *out, const uint8_t *in,
-                                       icnl_tlv_off_t in_len, uint8_t dispatch)
+                                       icnl_tlv_off_t in_len, uint8_t dispatch,
+                                       void *context)
 {
+    (void) dispatch;
     icnl_tlv_off_t pos_out = 0, pos_in = 0;
-    const uint8_t *a, *b = NULL;
-    uint8_t *out_packet_length;
+    uint8_t *out_packet_length, hop_id = 0;
 
-    a = in + pos_in++;
-    if (dispatch == ICNL_DISPATCH_NDN_DATA_HC_AB) {
-        b = in + pos_in++;
+    if (dispatch & 0x01) {
+        uint8_t cid = hop_id = in[pos_in++];
+
+        while (cid & 0x80) {
+            cid = in[pos_in++];
+            /* do nothin for now */
+        }
     }
 
     out[pos_out++] = ICNL_NDN_TLV_DATA;
@@ -350,11 +360,13 @@ icnl_tlv_off_t icnl_ndn_decode_data_hc(uint8_t *out, const uint8_t *in,
     /* skip packet length */
     icnl_ndn_tlv_hc_read(in, &pos_in);
 
-    pos_out += icnl_ndn_decode_name(out + pos_out, in, &pos_in, a);
+    pos_out += icnl_ndn_decode_name(out + pos_out, in, &pos_in, hop_id, NULL, context);
+#if 0
     pos_out += icnl_ndn_decode_meta_info(out + pos_out, in, &pos_in, b);
-    pos_out += icnl_ndn_decode_content(out + pos_out, in, &pos_in, a);
-    pos_out += icnl_ndn_decode_signature_info(out + pos_out, in, &pos_in, a);
-    pos_out += icnl_ndn_decode_signature_value(out + pos_out, in, &pos_in, in_len, a);
+#endif
+    pos_out += icnl_ndn_decode_content(out + pos_out, in, &pos_in);
+    pos_out += icnl_ndn_decode_signature_info(out + pos_out, in, &pos_in);
+    pos_out += icnl_ndn_decode_signature_value(out + pos_out, in, &pos_in);
 
     memcpy(out + pos_out, in + pos_in, in_len - pos_in);
     pos_out += in_len - pos_in;
@@ -384,7 +396,7 @@ icnl_tlv_off_t icnl_ndn_decode_data(uint8_t *out, const uint8_t *in, icnl_tlv_of
 }
 
 icnl_tlv_off_t icnl_ndn_decode(uint8_t *out, icnl_proto_t proto, const uint8_t *in,
-                               icnl_tlv_off_t in_len)
+                               icnl_tlv_off_t in_len, void *context)
 {
     icnl_tlv_off_t pos = 0, out_len = 0;
     uint8_t *dispatch = (uint8_t *) (in + pos++);
@@ -398,13 +410,13 @@ icnl_tlv_off_t icnl_ndn_decode(uint8_t *out, icnl_proto_t proto, const uint8_t *
         }
     }
     else if (proto == ICNL_PROTO_NDN_HC) {
-        if ((*dispatch & 0xF8) == ICNL_DISPATCH_NDN_INT_HC_A) {
+        if (((*dispatch) & 0x40) == 0) {
             out_len = icnl_ndn_decode_interest_hc(out, in + pos, in_len - pos,
-                                                  *dispatch);
+                                                  *dispatch, context);
         }
-        else if ((*dispatch & 0xF8 ) == ICNL_DISPATCH_NDN_DATA_HC_A) {
+        else {
             out_len = icnl_ndn_decode_data_hc(out, in + pos, in_len - pos,
-                                              *dispatch);
+                                              *dispatch, context);
         }
     }
 
