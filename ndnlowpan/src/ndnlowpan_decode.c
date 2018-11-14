@@ -42,7 +42,7 @@ icnl_tlv_off_t icnl_ndn_decode_name(uint8_t *out, const uint8_t *in,
         pos_out += out_total_name_len = icnl_cb_context_decompress_name((out + pos_out), (*prefix_cid) & 0x7F, context);
     }
 
-    if ((hop_id & 0x40) && icnl_cb_hopid_decompress_name) {
+    if (hop_id && icnl_cb_hopid_decompress_name) {
         pos_out += out_total_name_len = icnl_cb_hopid_decompress_name((out + pos_out), hop_id & 0x7F, context);
     }
 
@@ -277,28 +277,21 @@ icnl_tlv_off_t icnl_ndn_decode_interest_hc(uint8_t *out, const uint8_t *in,
     icnl_tlv_off_t pos_out = 0, pos_in = 0;
     uint8_t *out_packet_length, *prefix_cid = NULL;
 
-    if (dispatch & 0x01) {
-        bool first = true;
+    if (dispatch & 0x20) {
         uint8_t cid = in[pos_in];
 
-        if ((cid & 0x40) && icnl_cb_hopid) {
+        /* HopID */
+        if (cid && icnl_cb_hopid) {
             icnl_cb_hopid(cid & 0x7F);
-            first = false;
         }
 
-        if (first || (cid & 0x80)) {
-            if (!first) {
-                pos_in++;
-            }
-            if (!prefix_cid) {
-                prefix_cid = (uint8_t *) (in + pos_in);
-                cid = in[pos_in++];
-            }
+        if (cid & 0x80) {
+            prefix_cid = (uint8_t *) (in + (++pos_in));
 
-            while (cid & 0x80) {
-                cid = in[pos_in++];
+            do {
                 /* do nothing for now */
-            }
+                cid = in[pos_in++];
+            } while (cid & 0x80);
         }
     }
 
@@ -345,13 +338,15 @@ icnl_tlv_off_t icnl_ndn_decode_data_hc(uint8_t *out, const uint8_t *in,
     icnl_tlv_off_t pos_out = 0, pos_in = 0;
     uint8_t *out_packet_length, hop_id = 0;
 
-    if (dispatch & 0x01) {
-        uint8_t cid = hop_id = in[pos_in++];
+    if (dispatch & 0x20) {
+        uint8_t cid = in[pos_in];
 
-        while (cid & 0x80) {
-            cid = in[pos_in++];
+        hop_id = cid & 0x7F;
+
+        do {
             /* do nothin for now */
-        }
+            cid = in[pos_in++];
+        } while (cid & 0x80);
     }
 
     out[pos_out++] = ICNL_NDN_TLV_DATA;

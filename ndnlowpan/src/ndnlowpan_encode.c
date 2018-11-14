@@ -244,13 +244,15 @@ icnl_tlv_off_t icnl_ndn_encode_interest_hc(uint8_t *out, const uint8_t *in,
     *disp = 0x80;
 
     if (cids) {
-        *disp |= 0x01;
+        *disp |= 0x20;
         uint8_t *cid_ptr, cid;
         for (unsigned i = 0; i < cid_len; i++) {
             cid_ptr = out + (pos_out++);
             cid = cids[i] & 0x7F;
-            if (!(cid & 0x40) && icnl_cb_context_skip_prefix) {
-                skip_name_octets = icnl_cb_context_skip_prefix(cid, context);
+            if (i > 0) {
+                if (icnl_cb_context_skip_prefix) {
+                    skip_name_octets = icnl_cb_context_skip_prefix(cid, context);
+                }
             }
             *cid_ptr = cid;
             if (i <  cid_len - 1) {
@@ -327,12 +329,12 @@ icnl_tlv_off_t icnl_ndn_encode_data_hc(uint8_t *out, const uint8_t *in,
     *disp = 0xC0;
 
     if (cids) {
-        *disp |= 0x01;
+        *disp |= 0x20;
         uint8_t *cid_ptr;
 
         hop_id = cids[0] & 0x7F;
 
-        if ((hop_id & 0x40) && icnl_cb_hopid_skip_prefix) {
+        if (hop_id && icnl_cb_hopid_skip_prefix) {
             skip_name_octets = icnl_cb_hopid_skip_prefix(hop_id, context);
         }
 
